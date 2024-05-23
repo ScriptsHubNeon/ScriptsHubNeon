@@ -1,71 +1,108 @@
--- Define the hitbox properties
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+-- Function to create a hitbox
 local function createHitbox()
     local hitbox = Instance.new("Part")
-    hitbox.Size = Vector3.new(5, 5, 5) -- Size of the hitbox
-    hitbox.Anchored = true -- Ensure the hitbox stays in place
-    hitbox.CanCollide = false -- Disable collision for the hitbox
-    hitbox.BrickColor = BrickColor.new("Bright red") -- Color the hitbox red
-    hitbox.Transparency = 0.5 -- Make the hitbox slightly transparent
+    hitbox.Size = Vector3.new(5, 5, 5)
+    hitbox.Anchored = true
+    hitbox.CanCollide = false
+    hitbox.BrickColor = BrickColor.new("Bright red")
+    hitbox.Transparency = 0.5
     hitbox.Name = "Hitbox"
-    
-    -- Create a new BillboardGui to make it float above the player smoothly
-    local billboardGui = Instance.new("BillboardGui", hitbox)
-    billboardGui.Size = UDim2.new(1, 0, 1, 0)
-    billboardGui.Adornee = hitbox
-    billboardGui.AlwaysOnTop = true
-    
     return hitbox
 end
 
--- Function to position the hitbox above the player
-local function positionHitboxAbovePlayer(player)
-    local character = player.Character
-    if character then
-        local head = character:FindFirstChild("Head")
-        if head then
-            local hitbox = createHitbox()
-            hitbox.CFrame = CFrame.new(head.Position + Vector3.new(0, 7, 0)) -- Adjust the Y offset as needed
-            hitbox.Parent = workspace
-            
-            -- Smooth floating effect
-            game:GetService("RunService").Heartbeat:Connect(function()
-                if character and character:FindFirstChild("Head") then
-                    hitbox.Position = character.Head.Position + Vector3.new(0, 7, 0)
-                else
-                    hitbox:Destroy() -- Destroy hitbox if character no longer exists
-                end
-            end)
-        end
+-- Function to position the hitbox above an enemy
+local function positionHitboxAboveEnemy(enemy, hitbox)
+    local head = enemy:FindFirstChild("Head")
+    if head then
+        hitbox.Position = head.Position + Vector3.new(0, 7, 0) -- Adjust the Y offset as needed
+        hitbox.Parent = workspace
+
+        -- Smooth floating effect
+        local connection
+        connection = RunService.Heartbeat:Connect(function()
+            if enemy and enemy:FindFirstChild("Head") then
+                hitbox.Position = enemy.Head.Position + Vector3.new(0, 7, 0)
+            else
+                hitbox:Destroy()
+                connection:Disconnect()
+            end
+        end)
+
+        return connection
     end
 end
 
 -- Function to handle hitbox touch
 local function onHitboxTouch(hitbox, other)
-    local player = game.Players:GetPlayerFromCharacter(other.Parent)
+    local player = Players:GetPlayerFromCharacter(other.Parent)
     if player then
-        print(player.Name .. " has been hit!")
+        print(player.Name .. " has been hit by an enemy!")
         -- Add additional code here to handle the player being hit, e.g., reduce health
     end
 end
 
--- Connect the touch event to the hitbox
+-- Function to connect the hitbox touch event
 local function connectHitboxTouch(hitbox)
     hitbox.Touched:Connect(function(other)
         onHitboxTouch(hitbox, other)
     end)
 end
 
--- Listen for player character spawn to position the hitbox
-game.Players.PlayerAdded:Connect(function(player)
-    player.CharacterAdded:Connect(function(character)
-        wait(1) -- Wait for the character to fully load
-        positionHitboxAbovePlayer(player)
-    end)
-end)
+-- Function to initialize the enemy and attach a hitbox
+local function initializeEnemy(enemy)
+    local hitbox = createHitbox()
+    connectHitboxTouch(hitbox)
+    return positionHitboxAboveEnemy(enemy, hitbox)
+end
 
--- Position hitboxes for players already in the game (if script runs after players have joined)
-for _, player in ipairs(game.Players:GetPlayers()) do
-    if player.Character then
-        positionHitboxAbovePlayer(player)
+-- Table to track active hitboxes and their connections
+local activeHitboxes = {}
+
+-- Function to toggle hitboxes
+local function toggleHitboxes(state)
+    for _, connection in pairs(activeHitboxes) do
+        connection:Disconnect()
+    end
+    activeHitboxes = {}
+    
+    if state then
+        local enemies = workspace:WaitForChild("Enemies"):GetChildren()
+        for _, enemy in ipairs(enemies) do
+            local connection = initializeEnemy(enemy)
+            if connection then
+                table.insert(activeHitboxes, connection)
+            end
+        end
     end
 end
+
+-- GUI creation
+local ScreenGui = Instance.new("ScreenGui")
+local Frame = Instance.new("Frame")
+local ToggleButton = Instance.new("TextButton")
+
+ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+Frame.Size = UDim2.new(0, 200, 0, 100)
+Frame.Position = UDim2.new(0.5, -100, 0.5, -50)
+Frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+Frame.Parent = ScreenGui
+
+ToggleButton.Size = UDim2.new(1, 0, 1, 0)
+ToggleButton.Text = "Toggle Hitboxes"
+ToggleButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+ToggleButton.Parent = Frame
+
+local hitboxesEnabled = false
+
+ToggleButton.MouseButton1Click:Connect(function()
+    hitboxesEnabled = not hitboxesEnabled
+    ToggleButton.Text = hitboxesEnabled and "Disable Hitboxes" or "Enable Hitboxes"
+    toggleHitboxes(hitboxesEnabled)
+end)
+
+-- Initial state
+toggleHitboxes(hitboxesEnabled)
