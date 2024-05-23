@@ -1,0 +1,71 @@
+-- Define the hitbox properties
+local function createHitbox()
+    local hitbox = Instance.new("Part")
+    hitbox.Size = Vector3.new(5, 5, 5) -- Size of the hitbox
+    hitbox.Anchored = true -- Ensure the hitbox stays in place
+    hitbox.CanCollide = false -- Disable collision for the hitbox
+    hitbox.BrickColor = BrickColor.new("Bright red") -- Color the hitbox red
+    hitbox.Transparency = 0.5 -- Make the hitbox slightly transparent
+    hitbox.Name = "Hitbox"
+    
+    -- Create a new BillboardGui to make it float above the player smoothly
+    local billboardGui = Instance.new("BillboardGui", hitbox)
+    billboardGui.Size = UDim2.new(1, 0, 1, 0)
+    billboardGui.Adornee = hitbox
+    billboardGui.AlwaysOnTop = true
+    
+    return hitbox
+end
+
+-- Function to position the hitbox above the player
+local function positionHitboxAbovePlayer(player)
+    local character = player.Character
+    if character then
+        local head = character:FindFirstChild("Head")
+        if head then
+            local hitbox = createHitbox()
+            hitbox.CFrame = CFrame.new(head.Position + Vector3.new(0, 7, 0)) -- Adjust the Y offset as needed
+            hitbox.Parent = workspace
+            
+            -- Smooth floating effect
+            game:GetService("RunService").Heartbeat:Connect(function()
+                if character and character:FindFirstChild("Head") then
+                    hitbox.Position = character.Head.Position + Vector3.new(0, 7, 0)
+                else
+                    hitbox:Destroy() -- Destroy hitbox if character no longer exists
+                end
+            end)
+        end
+    end
+end
+
+-- Function to handle hitbox touch
+local function onHitboxTouch(hitbox, other)
+    local player = game.Players:GetPlayerFromCharacter(other.Parent)
+    if player then
+        print(player.Name .. " has been hit!")
+        -- Add additional code here to handle the player being hit, e.g., reduce health
+    end
+end
+
+-- Connect the touch event to the hitbox
+local function connectHitboxTouch(hitbox)
+    hitbox.Touched:Connect(function(other)
+        onHitboxTouch(hitbox, other)
+    end)
+end
+
+-- Listen for player character spawn to position the hitbox
+game.Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function(character)
+        wait(1) -- Wait for the character to fully load
+        positionHitboxAbovePlayer(player)
+    end)
+end)
+
+-- Position hitboxes for players already in the game (if script runs after players have joined)
+for _, player in ipairs(game.Players:GetPlayers()) do
+    if player.Character then
+        positionHitboxAbovePlayer(player)
+    end
+end
